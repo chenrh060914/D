@@ -1,0 +1,19 @@
+============================================================
+Adaptive Fair Voting System (AFVS)
+============================================================
+
+Core Features:
+  • 动态权重调整：根据比赛阶段自动调整评委/粉丝投票权重
+  • 争议预防机制：防止评委评分过低的选手获得过高排名
+  • 决赛专业导向：决赛阶段增加评委权重至70%，保护专业性
+  • 强化学习优化：使用历史数据学习最优权重配置策略
+
+Weight Schedule:
+  early_stage: Judge=0.5, Fan=0.5
+  mid_stage: Judge=0.55, Fan=0.45
+  late_stage: Judge=0.6, Fan=0.4
+  final_stage: Judge=0.7, Fan=0.3
+
+Controversy Prevention Rules:
+  min_judge_percentile: 0.25
+  max_consecutive_low: 3
