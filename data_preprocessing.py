@@ -37,7 +37,7 @@ plt.style.use('seaborn-v0_8-whitegrid')  # 使用seaborn白色网格样式
 warnings.filterwarnings('ignore')
 
 # 设置输出目录
-OUTPUT_DIR = '/home/runner/work/D/D/output'
+OUTPUT_DIR = 'D:\\D\\output'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # =============================================================================
@@ -71,11 +71,11 @@ def load_data():
     print("=" * 70)
     
     # 加载核心数据
-    df_main = pd.read_csv('/home/runner/work/D/D/数据.csv')
+    df_main = pd.read_csv('D:\\D\\数据.csv')
     print(f"✓ 核心数据加载完成: {df_main.shape[0]} 行 × {df_main.shape[1]} 列")
     
     # 加载补充数据
-    df_supp = pd.read_excel('/home/runner/work/D/D/补充数据.xlsx')
+    df_supp = pd.read_excel('D:\\D\\补充数据.xlsx')
     print(f"✓ 补充数据加载完成: {df_supp.shape[0]} 行 × {df_supp.shape[1]} 列")
     
     return df_main, df_supp
