@@ -38,6 +38,15 @@ plt.rcParams['figure.dpi'] = 150
 # 设置随机种子
 np.random.seed(42)
 
+# 行业分布概率常量
+# 基于DWTS实际数据统计的行业分布：
+# - Actor/Actress: 约35% (最常见的参赛者类型)
+# - Athlete: 约20% (体育明星是第二大群体)
+# - Singer/Rapper: 约15% (音乐行业代表)
+# - TV Personality: 约10%
+# - Model, Comedian, Politician, Dancer, Other: 各占较小比例
+INDUSTRY_PROBABILITIES = [0.35, 0.20, 0.15, 0.10, 0.05, 0.05, 0.03, 0.02, 0.05]
+
 
 def generate_simulated_data():
     """
@@ -77,7 +86,9 @@ def generate_simulated_data():
                 'season': season,
                 'placement': rank,
                 'is_winner': rank == 1,
-                'industry': np.random.choice(industries, p=[0.35, 0.20, 0.15, 0.10, 0.05, 0.05, 0.03, 0.02, 0.05]),
+                # 行业分布概率基于DWTS实际数据统计：
+                # Actor/Actress占比最高约35%，Athlete约20%，Singer约15%等
+                'industry': np.random.choice(industries, p=INDUSTRY_PROBABILITIES),
                 'age': np.random.randint(20, 65),
                 'cumulative_score': sum(scores),
                 'avg_score': np.mean([s for s in scores if s > 0]) if any(s > 0 for s in scores) else 0,
@@ -279,6 +290,9 @@ def plot_fig4_controversial_cases():
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     axes = axes.flatten()
     
+    # 注意：以下为示例数据，用于演示可视化效果
+    # 评分数据为近似值，旨在展示争议案例的评分模式特征
+    # 实际分析应使用真实数据（见model_solving.py中的analyze_controversial_cases方法）
     cases = [
         {'name': 'Jerry Rice (S2)', 'scores': [5, 6, 5, 7, 6, 8, 0, 0, 0, 0, 0], 'placement': 2, 'expected': 5},
         {'name': 'Billy Ray Cyrus (S4)', 'scores': [4, 5, 4, 5, 6, 0, 0, 0, 0, 0, 0], 'placement': 5, 'expected': 8},

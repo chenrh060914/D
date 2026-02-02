@@ -356,7 +356,10 @@ class FanVoteEstimator:
         self.estimates = pd.DataFrame(all_results)
         
         # 计算置信区间（使用采样数据）
-        sample_seasons = sorted(seasons)[:3]  # 为效率只对前3个赛季计算
+        # 注意：为提高计算效率，仅对前3个赛季计算置信区间作为代表性样本
+        # 限制说明：这可能无法完全反映所有赛季的不确定性，尤其是存在规则变化时
+        # 生产环境建议：设置更大的采样范围或对全部数据计算
+        sample_seasons = sorted(seasons)[:3]
         sample_df = df[df['season'].isin(sample_seasons)].copy().reset_index(drop=True)
         self.confidence_intervals = self.bootstrap_confidence_intervals(sample_df)
         
@@ -517,7 +520,10 @@ class VotingMethodComparator:
             # 标签：最终排名是否意外（低评分高排名）
             # 简化定义：排名靠前（<=3）但累积评分低于中位数
             median_score = df['cumulative_total_score'].median() if 'cumulative_total_score' in df.columns else 100
-            is_controversial = (row.get('placement', 10) <= 3) and (row.get('cumulative_total_score', 0) < median_score)
+            # 使用数据集中位数作为默认排名，避免任意值偏差
+            default_placement = df['placement'].median() if 'placement' in df.columns else 7
+            placement = row.get('placement', default_placement)
+            is_controversial = (placement <= 3) and (row.get('cumulative_total_score', 0) < median_score)
             labels.append(1 if is_controversial else 0)
         
         return pd.DataFrame(features), np.array(labels)
@@ -1293,7 +1299,9 @@ def main():
         print("开始问题1求解：粉丝投票估算模型")
         print("▶" * 30)
         
-        fan_estimator = FanVoteEstimator(n_bootstrap=50)  # 演示用较少次数
+        # 注意：演示使用50次Bootstrap采样以加快运行速度
+        # 生产环境/美赛提交建议：设置n_bootstrap=1000以获得更稳定的置信区间估计
+        fan_estimator = FanVoteEstimator(n_bootstrap=50)
         fan_estimator.fit(data['q1'])
         consistency = fan_estimator.evaluate_consistency(data['q1'])
         print(f"\n  一致性评估: 准确率 = {consistency['accuracy']:.2%}")
