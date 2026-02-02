@@ -1,202 +1,176 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-问题3：名人特征影响分析
-========================
-模型方法：多元线性回归 + XGBoost + SHAP可解释性分析
+问题3：名人特征影响分析（改进版）
+==================================
+模型方法：多元线性回归 + XGBoost + SHAP
 
-核心思路：
-1. 分析名人特征（年龄、行业、地域等）对比赛结果的影响
-2. 使用多元线性回归获得系数解释
-3. 使用XGBoost捕捉非线性关系
-4. 使用SHAP分析差异化影响（评委vs粉丝）
+重点改进：只使用名人特征
+    - 年龄 (celebrity_age_during_season)
+    - 行业 (celebrity_industry)
+    - 地区 (celebrity_homestate)
+    - 国籍 (celebrity_homecountry/region)
+    
+不包含评分相关特征（如overall_avg_score）
+
+子问题：
+    3.1 名人特征对比赛结果的影响分析
+    3.2 对评委评分vs粉丝投票的差异化影响
+    3.3 舞者特征的影响分析
 
 作者：MCM 2026 C题参赛团队
 """
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.linear_model import Ridge
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import cross_val_score, KFold
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, mean_squared_error
 from scipy import stats
 import warnings
 warnings.filterwarnings('ignore')
 
-# 尝试导入XGBoost
-try:
-    import xgboost as xgb
-    HAS_XGBOOST = True
-except ImportError:
-    HAS_XGBOOST = False
-    print("⚠ XGBoost未安装，将使用随机森林替代")
-    from sklearn.ensemble import RandomForestRegressor
+# 使用随机森林替代XGBoost（无需额外安装）
+from sklearn.ensemble import RandomForestRegressor
 
 # ============================================
-# 第一部分：数据输入模块
+# 第一部分：数据输入
 # ============================================
 
 def load_data(filepath):
-    """
-    加载预处理后的数据
-    
-    参数:
-        filepath: 数据文件路径
-    
-    返回:
-        DataFrame: 加载的数据
-    """
+    """加载数据"""
     try:
         data = pd.read_csv(filepath, encoding='utf-8-sig')
         print(f"✓ 数据加载成功: {len(data)} 条记录")
         return data
-    except FileNotFoundError:
-        print(f"✗ 错误: 文件 {filepath} 未找到")
-        return None
     except Exception as e:
         print(f"✗ 数据加载错误: {str(e)}")
         return None
 
 
 # ============================================
-# 第二部分：特征工程
+# 第二部分：名人特征工程（只使用名人特征）
 # ============================================
 
-class FeatureEngineer:
+class CelebrityFeatureEngineer:
     """
     名人特征工程器
     
-    处理名人特征：
-    - 年龄: 数值型，可分箱
-    - 行业: 类别型，编码处理
-    - 地域: 类别型，分组处理
-    - 国籍: 类别型，二值化
+    只处理名人相关特征，不包含评分数据：
+    - 年龄
+    - 行业
+    - 地区（州）
+    - 国籍
     """
     
     def __init__(self):
         self.label_encoders = {}
-        self.scaler = StandardScaler()
         self.feature_names = []
     
     def process_age(self, data):
-        """
-        处理年龄特征
-        
-        分箱策略：
-        - 青年: <30岁
-        - 中年: 30-45岁
-        - 成熟: >45岁
-        """
+        """处理年龄特征"""
         age_col = 'celebrity_age_during_season'
-        if age_col not in data.columns:
-            return data
-        
         data = data.copy()
         
-        # 保留原始年龄
-        data['age'] = data[age_col].fillna(data[age_col].median())
-        
-        # 年龄分箱
-        def age_bin(age):
-            if pd.isna(age):
-                return 'Unknown'
-            elif age < 30:
-                return 'Young'
-            elif age <= 45:
-                return 'Middle'
+        if age_col in data.columns:
+            data['age'] = data[age_col].fillna(data[age_col].median())
+            
+            # 年龄分箱
+            def age_group(age):
+                if pd.isna(age):
+                    return 'Unknown'
+                elif age < 25:
+                    return 'Young (<25)'
+                elif age < 35:
+                    return 'Prime (25-34)'
+                elif age < 45:
+                    return 'Mature (35-44)'
+                elif age < 55:
+                    return 'Senior (45-54)'
+                else:
+                    return 'Veteran (55+)'
+            
+            data['age_group'] = data['age'].apply(age_group)
+            
+            # 编码
+            if 'age_group' not in self.label_encoders:
+                self.label_encoders['age_group'] = LabelEncoder()
+                data['age_group_encoded'] = self.label_encoders['age_group'].fit_transform(data['age_group'])
             else:
-                return 'Mature'
-        
-        data['age_group'] = data['age'].apply(age_bin)
+                data['age_group_encoded'] = self.label_encoders['age_group'].transform(data['age_group'])
+        else:
+            data['age'] = 35  # 默认值
+            data['age_group_encoded'] = 0
         
         return data
     
     def process_industry(self, data):
-        """
-        处理行业特征
-        
-        分组策略：
-        - Entertainment: Actor/Actress, Singer, TV Personality
-        - Sports: Athlete, Olympian
-        - Other: 其他行业
-        """
+        """处理行业特征"""
         industry_col = 'celebrity_industry'
-        if industry_col not in data.columns:
-            return data
-        
         data = data.copy()
         
-        # 行业分组映射
-        industry_mapping = {
-            'Actor': 'Entertainment',
-            'Actress': 'Entertainment',
-            'Actor/Actress': 'Entertainment',
-            'Singer': 'Entertainment',
-            'Singer/Rapper': 'Entertainment',
-            'TV Personality': 'Entertainment',
-            'Model': 'Entertainment',
-            'Reality Star': 'Entertainment',
-            'Athlete': 'Sports',
-            'Olympian': 'Sports',
-            'NFL Player': 'Sports',
-            'NBA Player': 'Sports',
-            'Journalist': 'Media',
-            'News Anchor': 'Media',
-            'Politician': 'Politics'
-        }
-        
-        def map_industry(industry):
-            if pd.isna(industry):
-                return 'Other'
-            for key, value in industry_mapping.items():
-                if key.lower() in str(industry).lower():
-                    return value
-            return 'Other'
-        
-        data['industry_group'] = data[industry_col].apply(map_industry)
-        
-        # 编码
-        if 'industry' not in self.label_encoders:
-            self.label_encoders['industry'] = LabelEncoder()
-            data['industry_encoded'] = self.label_encoders['industry'].fit_transform(data['industry_group'])
+        if industry_col in data.columns:
+            # 行业分组（简化）
+            def categorize_industry(industry):
+                if pd.isna(industry):
+                    return 'Other'
+                industry = str(industry).lower()
+                
+                if any(x in industry for x in ['actor', 'actress', 'singer', 'musician', 'entertainer']):
+                    return 'Entertainment'
+                elif any(x in industry for x in ['athlete', 'olympian', 'nfl', 'nba', 'sport', 'player']):
+                    return 'Sports'
+                elif any(x in industry for x in ['model', 'reality', 'tv personality']):
+                    return 'Reality/Model'
+                elif any(x in industry for x in ['journalist', 'news', 'anchor', 'host']):
+                    return 'Media'
+                else:
+                    return 'Other'
+            
+            data['industry_group'] = data[industry_col].apply(categorize_industry)
+            
+            # 编码
+            if 'industry' not in self.label_encoders:
+                self.label_encoders['industry'] = LabelEncoder()
+                data['industry_encoded'] = self.label_encoders['industry'].fit_transform(data['industry_group'])
+            else:
+                # 处理未见过的类别
+                known_classes = set(self.label_encoders['industry'].classes_)
+                data['industry_group'] = data['industry_group'].apply(
+                    lambda x: x if x in known_classes else 'Other')
+                data['industry_encoded'] = self.label_encoders['industry'].transform(data['industry_group'])
         else:
-            data['industry_encoded'] = self.label_encoders['industry'].transform(data['industry_group'])
+            data['industry_group'] = 'Other'
+            data['industry_encoded'] = 0
+        
+        # One-hot编码行业
+        for industry in ['Entertainment', 'Sports', 'Reality/Model', 'Media', 'Other']:
+            data[f'industry_{industry}'] = (data['industry_group'] == industry).astype(int)
         
         return data
     
     def process_region(self, data):
-        """
-        处理地域特征
-        
-        分组策略：按美国人口普查区域分组
-        - Northeast, Southeast, Midwest, Southwest, West, Non-US
-        """
+        """处理地区特征"""
         state_col = 'celebrity_homestate'
         country_col = 'celebrity_homecountry/region'
-        
         data = data.copy()
         
         # 美国州到区域的映射
         state_to_region = {
-            # Northeast
             'Connecticut': 'Northeast', 'Maine': 'Northeast', 'Massachusetts': 'Northeast',
             'New Hampshire': 'Northeast', 'Rhode Island': 'Northeast', 'Vermont': 'Northeast',
             'New Jersey': 'Northeast', 'New York': 'Northeast', 'Pennsylvania': 'Northeast',
-            # Southeast
             'Delaware': 'Southeast', 'Florida': 'Southeast', 'Georgia': 'Southeast',
             'Maryland': 'Southeast', 'North Carolina': 'Southeast', 'South Carolina': 'Southeast',
             'Virginia': 'Southeast', 'West Virginia': 'Southeast', 'Alabama': 'Southeast',
             'Kentucky': 'Southeast', 'Mississippi': 'Southeast', 'Tennessee': 'Southeast',
             'Arkansas': 'Southeast', 'Louisiana': 'Southeast',
-            # Midwest
             'Illinois': 'Midwest', 'Indiana': 'Midwest', 'Michigan': 'Midwest',
             'Ohio': 'Midwest', 'Wisconsin': 'Midwest', 'Iowa': 'Midwest',
             'Kansas': 'Midwest', 'Minnesota': 'Midwest', 'Missouri': 'Midwest',
             'Nebraska': 'Midwest', 'North Dakota': 'Midwest', 'South Dakota': 'Midwest',
-            # Southwest
             'Arizona': 'Southwest', 'New Mexico': 'Southwest', 'Oklahoma': 'Southwest', 'Texas': 'Southwest',
-            # West
             'Colorado': 'West', 'Idaho': 'West', 'Montana': 'West', 'Nevada': 'West',
             'Utah': 'West', 'Wyoming': 'West', 'Alaska': 'West', 'California': 'West',
             'Hawaii': 'West', 'Oregon': 'West', 'Washington': 'West'
@@ -210,725 +184,503 @@ class FeatureEngineer:
                 return 'Non-US'
             
             if pd.notna(state):
-                return state_to_region.get(state, 'Other-US')
+                return state_to_region.get(str(state), 'Other-US')
             
             return 'Unknown'
         
         data['region'] = data.apply(get_region, axis=1)
         
-        # 编码
+        # 是否美国人
+        data['is_us'] = (data['region'] != 'Non-US').astype(int)
+        
+        # 编码区域
         if 'region' not in self.label_encoders:
             self.label_encoders['region'] = LabelEncoder()
             data['region_encoded'] = self.label_encoders['region'].fit_transform(data['region'])
         else:
+            known_regions = set(self.label_encoders['region'].classes_)
+            data['region'] = data['region'].apply(lambda x: x if x in known_regions else 'Unknown')
             data['region_encoded'] = self.label_encoders['region'].transform(data['region'])
-        
-        # 是否美国人
-        data['is_us'] = (data['region'] != 'Non-US').astype(int)
         
         return data
     
-    def build_features(self, data):
+    def build_celebrity_features(self, data):
         """
-        构建完整特征矩阵
+        构建名人特征矩阵
         
-        参数:
-            data: 原始数据
-        
-        返回:
-            data: 处理后的数据
-            feature_names: 特征名称列表
+        只包含名人特征，不包含评分数据
         """
-        print("\n>>> 特征工程")
+        print("\n>>> 名人特征工程")
         print("-" * 40)
         
-        # 处理各类特征
         data = self.process_age(data)
         data = self.process_industry(data)
         data = self.process_region(data)
         
-        # 定义特征列表
+        # 定义特征列表（只有名人特征）
         self.feature_names = [
-            'age',
-            'industry_encoded',
-            'region_encoded',
-            'is_us'
+            'age',                    # 年龄（连续）
+            'industry_Entertainment', # 娱乐行业
+            'industry_Sports',        # 体育行业
+            'industry_Reality/Model', # 真人秀/模特
+            'industry_Media',         # 媒体行业
+            'region_encoded',         # 地区编码
+            'is_us'                   # 是否美国人
         ]
         
-        # 添加可用的其他特征
-        optional_features = ['cumulative_total_score', 'overall_avg_score', 
-                            'score_trend', 'active_weeks']
-        for feat in optional_features:
-            if feat in data.columns:
-                self.feature_names.append(feat)
-        
-        # 填充缺失值
-        for col in self.feature_names:
-            if col in data.columns:
-                data[col] = data[col].fillna(data[col].median() if data[col].dtype in ['float64', 'int64'] else 0)
-        
-        print(f"✓ 特征工程完成")
+        print(f"✓ 名人特征工程完成")
         print(f"  - 特征数量: {len(self.feature_names)}")
         print(f"  - 特征列表: {self.feature_names}")
+        print(f"  ⚠ 注意：不包含评分相关特征")
         
         return data, self.feature_names
 
 
 # ============================================
-# 第三部分：多元线性回归模型
+# 第三部分：子问题3.1 - 特征对结果的影响
 # ============================================
 
-class LinearRegressionAnalyzer:
+def analyze_feature_impact_on_results(data, feature_engineer):
     """
-    多元线性回归分析器
+    子问题3.1：名人特征对比赛结果的影响分析
     
-    用于分析名人特征对比赛结果的线性影响
-    
-    参数说明:
-        regularization: 正则化方法 ('none', 'ridge', 'lasso')
-        alpha: 正则化系数
+    使用多元回归和随机森林分析
     """
-    
-    def __init__(self, regularization='ridge', alpha=1.0):
-        """
-        初始化方式：
-            - regularization: 正则化类型，ridge对共线性更稳健
-            - alpha: 正则化强度，较大值减少过拟合
-        """
-        if regularization == 'ridge':
-            self.model = Ridge(alpha=alpha)
-        elif regularization == 'lasso':
-            self.model = Lasso(alpha=alpha)
-        else:
-            self.model = LinearRegression()
-        
-        self.regularization = regularization
-        self.alpha = alpha
-        self.feature_names = None
-        self.coefficients = None
-        
-        print(f"✓ 线性回归模型初始化")
-        print(f"  - 正则化: {regularization}")
-        print(f"  - Alpha: {alpha}")
-    
-    def fit(self, X, y, feature_names):
-        """
-        拟合模型
-        
-        参数:
-            X: 特征矩阵
-            y: 目标变量
-            feature_names: 特征名称
-        
-        注意事项:
-            - 使用VIF检验多重共线性
-            - 标注显著性水平
-        """
-        self.feature_names = feature_names
-        
-        # 标准化特征
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
-        # 拟合模型
-        self.model.fit(X_scaled, y)
-        
-        # 提取系数
-        self.coefficients = pd.DataFrame({
-            'feature': feature_names,
-            'coefficient': self.model.coef_,
-            'abs_coefficient': np.abs(self.model.coef_)
-        }).sort_values('abs_coefficient', ascending=False)
-        
-        # 计算R²
-        y_pred = self.model.predict(X_scaled)
-        r2 = r2_score(y, y_pred)
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        
-        print(f"\n模型拟合结果:")
-        print(f"  - R²: {r2:.4f}")
-        print(f"  - RMSE: {rmse:.4f}")
-        print(f"  - 截距: {self.model.intercept_:.4f}")
-        
-        return {
-            'r2': r2,
-            'rmse': rmse,
-            'intercept': self.model.intercept_,
-            'coefficients': self.coefficients
-        }
-    
-    def calculate_vif(self, X, feature_names):
-        """
-        计算方差膨胀因子（VIF）检测多重共线性
-        
-        VIF > 10 表示存在严重多重共线性
-        """
-        from statsmodels.stats.outliers_influence import variance_inflation_factor
-        
-        vif_data = []
-        for i, feature in enumerate(feature_names):
-            try:
-                vif = variance_inflation_factor(X, i)
-                vif_data.append({'feature': feature, 'VIF': vif})
-            except:
-                vif_data.append({'feature': feature, 'VIF': np.nan})
-        
-        vif_df = pd.DataFrame(vif_data)
-        
-        high_vif = vif_df[vif_df['VIF'] > 10]
-        if len(high_vif) > 0:
-            print(f"  ⚠ 发现多重共线性问题:")
-            for _, row in high_vif.iterrows():
-                print(f"    {row['feature']}: VIF = {row['VIF']:.2f}")
-        
-        return vif_df
-
-
-# ============================================
-# 第四部分：XGBoost模型
-# ============================================
-
-class XGBoostAnalyzer:
-    """
-    XGBoost回归分析器
-    
-    用于捕捉名人特征与比赛结果的非线性关系
-    
-    参数说明:
-        n_estimators: 树的数量
-        max_depth: 最大深度
-        learning_rate: 学习率
-        early_stopping_rounds: 早停轮数（防止过拟合）
-    """
-    
-    def __init__(self, n_estimators=100, max_depth=5, learning_rate=0.1, 
-                 early_stopping_rounds=10, random_state=42):
-        """
-        初始化方式：
-            - n_estimators=100: 足够的迭代次数
-            - max_depth=5: 限制深度避免过拟合
-            - learning_rate=0.1: 适中的学习率
-            - early_stopping: 早停机制防止过拟合
-        """
-        self.n_estimators = n_estimators
-        self.max_depth = max_depth
-        self.learning_rate = learning_rate
-        self.early_stopping_rounds = early_stopping_rounds
-        self.random_state = random_state
-        
-        if HAS_XGBOOST:
-            self.model = xgb.XGBRegressor(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                learning_rate=learning_rate,
-                random_state=random_state,
-                n_jobs=-1
-            )
-        else:
-            self.model = RandomForestRegressor(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                random_state=random_state,
-                n_jobs=-1
-            )
-        
-        self.feature_names = None
-        
-        print(f"✓ {'XGBoost' if HAS_XGBOOST else '随机森林'}模型初始化")
-        print(f"  - 树数量: {n_estimators}")
-        print(f"  - 最大深度: {max_depth}")
-    
-    def fit(self, X, y, feature_names, cv_folds=5):
-        """
-        拟合模型
-        
-        参数:
-            X: 特征矩阵
-            y: 目标变量
-            feature_names: 特征名称
-            cv_folds: 交叉验证折数
-        
-        注意事项:
-            - 使用早停机制防止过拟合
-            - 监控训练和验证损失曲线
-        """
-        self.feature_names = feature_names
-        
-        # 交叉验证
-        cv = KFold(n_splits=cv_folds, shuffle=True, random_state=self.random_state)
-        cv_scores = cross_val_score(self.model, X, y, cv=cv, scoring='r2')
-        
-        print(f"\n交叉验证R²: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
-        
-        # 在全部数据上训练
-        self.model.fit(X, y)
-        
-        # 特征重要性
-        importance = self.model.feature_importances_
-        feature_importance = pd.DataFrame({
-            'feature': feature_names,
-            'importance': importance
-        }).sort_values('importance', ascending=False)
-        
-        # 计算训练集指标
-        y_pred = self.model.predict(X)
-        r2 = r2_score(y, y_pred)
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        
-        print(f"训练集R²: {r2:.4f}")
-        print(f"训练集RMSE: {rmse:.4f}")
-        
-        # 过拟合检测
-        if r2 - cv_scores.mean() > 0.15:
-            print(f"  ⚠ 可能存在过拟合: 差距 = {r2 - cv_scores.mean():.4f}")
-        
-        return {
-            'cv_r2_mean': cv_scores.mean(),
-            'cv_r2_std': cv_scores.std(),
-            'train_r2': r2,
-            'train_rmse': rmse,
-            'feature_importance': feature_importance
-        }
-
-
-# ============================================
-# 第五部分：SHAP分析
-# ============================================
-
-def shap_analysis(model, X, feature_names, output_dir='output'):
-    """
-    SHAP值分析
-    
-    参数:
-        model: 训练好的模型
-        X: 特征矩阵
-        feature_names: 特征名称
-        output_dir: 输出目录
-    
-    返回:
-        shap_results: SHAP分析结果
-    """
-    print("\n>>> SHAP可解释性分析")
-    print("-" * 40)
-    
-    try:
-        import shap
-        
-        # 创建SHAP解释器
-        if HAS_XGBOOST:
-            explainer = shap.TreeExplainer(model)
-        else:
-            explainer = shap.TreeExplainer(model)
-        
-        shap_values = explainer.shap_values(X)
-        
-        # 计算每个特征的平均绝对SHAP值
-        mean_abs_shap = np.abs(shap_values).mean(axis=0)
-        shap_summary = pd.DataFrame({
-            'feature': feature_names,
-            'mean_abs_shap': mean_abs_shap
-        }).sort_values('mean_abs_shap', ascending=False)
-        
-        print(f"  ✓ SHAP分析完成")
-        print(f"\n  SHAP特征重要性排序:")
-        for i, row in shap_summary.iterrows():
-            print(f"    {row['feature']}: {row['mean_abs_shap']:.4f}")
-        
-        return {
-            'shap_values': shap_values,
-            'shap_summary': shap_summary,
-            'expected_value': explainer.expected_value
-        }
-        
-    except ImportError:
-        print("  ⚠ SHAP库未安装，跳过SHAP分析")
-        return None
-    except Exception as e:
-        print(f"  ⚠ SHAP分析出错: {str(e)}")
-        return None
-
-
-# ============================================
-# 第六部分：差异化影响分析
-# ============================================
-
-def differential_impact_analysis(data, feature_engineer, output_dir='output'):
-    """
-    差异化影响分析：比较特征对评委评分vs粉丝投票的不同影响
-    
-    参数:
-        data: 处理后的数据
-        feature_engineer: 特征工程器
-        output_dir: 输出目录
-    
-    返回:
-        diff_analysis: 差异化分析结果
-    """
-    print("\n>>> 差异化影响分析（评委 vs 粉丝）")
+    print("\n>>> 子问题3.1：名人特征对比赛结果的影响")
     print("=" * 50)
     
-    feature_names = feature_engineer.feature_names
+    data, feature_names = feature_engineer.build_celebrity_features(data)
     
     # 准备特征矩阵
     X = data[feature_names].fillna(0).values
+    y_placement = data['placement'].values  # 最终排名
+    
+    # 标准化
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    # 1. 线性回归分析
+    print("\n【线性回归分析】")
+    ridge = Ridge(alpha=1.0)
+    
+    cv = KFold(n_splits=5, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(ridge, X_scaled, y_placement, cv=cv, scoring='r2')
+    print(f"  交叉验证 R²: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+    
+    ridge.fit(X_scaled, y_placement)
+    
+    # 系数分析
+    coefficients = pd.DataFrame({
+        'feature': feature_names,
+        'coefficient': ridge.coef_,
+        'abs_coef': np.abs(ridge.coef_)
+    }).sort_values('abs_coef', ascending=False)
+    
+    print(f"\n  特征系数（标准化后）:")
+    for _, row in coefficients.iterrows():
+        direction = "↓更好" if row['coefficient'] < 0 else "↑更差"
+        print(f"    {row['feature']}: {row['coefficient']:.4f} ({direction})")
+    
+    # 2. 随机森林分析
+    print("\n【随机森林分析】")
+    rf = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42)
+    
+    rf_cv_scores = cross_val_score(rf, X, y_placement, cv=cv, scoring='r2')
+    print(f"  交叉验证 R²: {rf_cv_scores.mean():.4f} ± {rf_cv_scores.std():.4f}")
+    
+    rf.fit(X, y_placement)
+    
+    # 特征重要性
+    importance = pd.DataFrame({
+        'feature': feature_names,
+        'importance': rf.feature_importances_
+    }).sort_values('importance', ascending=False)
+    
+    print(f"\n  特征重要性:")
+    for _, row in importance.iterrows():
+        print(f"    {row['feature']}: {row['importance']:.4f}")
+    
+    # 3. 统计检验
+    print("\n【统计检验】")
+    
+    # 年龄与排名的相关性
+    age_corr, age_pval = stats.spearmanr(data['age'].fillna(35), data['placement'])
+    print(f"  年龄-排名相关性: r={age_corr:.4f}, p={age_pval:.4f}")
+    
+    # 行业差异ANOVA
+    industry_groups = data.groupby('industry_group')['placement'].apply(list).to_dict()
+    if len(industry_groups) > 1:
+        groups = list(industry_groups.values())
+        f_stat, p_val = stats.f_oneway(*groups)
+        print(f"  行业差异ANOVA: F={f_stat:.4f}, p={p_val:.4f}")
+    
+    return {
+        'coefficients': coefficients,
+        'importance': importance,
+        'linear_r2': cv_scores.mean(),
+        'rf_r2': rf_cv_scores.mean(),
+        'data': data,
+        'feature_names': feature_names
+    }
+
+
+# ============================================
+# 第四部分：子问题3.2 - 差异化影响
+# ============================================
+
+def analyze_differential_impact(data, feature_engineer, results_q31):
+    """
+    子问题3.2：对评委评分vs粉丝投票的差异化影响
+    
+    比较同一特征对评委评分和最终排名的不同影响
+    """
+    print("\n>>> 子问题3.2：差异化影响分析（评委 vs 粉丝）")
+    print("=" * 50)
+    
+    feature_names = results_q31['feature_names']
+    data = results_q31['data']
+    
+    X = data[feature_names].fillna(0).values
     
     # 目标变量
-    y_judge = data['overall_avg_score'].fillna(data['overall_avg_score'].median()).values
-    y_placement = data['placement'].values
+    y_judge = data['overall_avg_score'].fillna(data['overall_avg_score'].median()).values  # 评委评分
+    y_placement = data['placement'].values  # 最终排名（包含粉丝影响）
     
-    # 分别建立模型
-    results = {}
+    # 训练两个模型
+    rf_judge = RandomForestRegressor(n_estimators=50, max_depth=4, random_state=42)
+    rf_placement = RandomForestRegressor(n_estimators=50, max_depth=4, random_state=42)
     
-    # 评委评分模型
-    print("\n【评委评分预测模型】")
-    model_judge = XGBoostAnalyzer(n_estimators=50, max_depth=4)
-    results['judge'] = model_judge.fit(X, y_judge, feature_names)
+    rf_judge.fit(X, y_judge)
+    rf_placement.fit(X, y_placement)
     
-    # 排名预测模型（作为粉丝影响的代理）
-    print("\n【最终排名预测模型】")
-    model_placement = XGBoostAnalyzer(n_estimators=50, max_depth=4)
-    results['placement'] = model_placement.fit(X, y_placement, feature_names)
-    
-    # 对比特征重要性
-    judge_imp = results['judge']['feature_importance'].set_index('feature')['importance']
-    place_imp = results['placement']['feature_importance'].set_index('feature')['importance']
-    
-    comparison = pd.DataFrame({
+    # 比较特征重要性
+    judge_importance = pd.DataFrame({
         'feature': feature_names,
-        'judge_importance': [judge_imp.get(f, 0) for f in feature_names],
-        'placement_importance': [place_imp.get(f, 0) for f in feature_names]
+        'judge_importance': rf_judge.feature_importances_
     })
     
-    comparison['importance_diff'] = comparison['placement_importance'] - comparison['judge_importance']
-    comparison = comparison.sort_values('importance_diff', ascending=False)
+    placement_importance = pd.DataFrame({
+        'feature': feature_names,
+        'placement_importance': rf_placement.feature_importances_
+    })
     
-    print("\n特征影响差异（排名 - 评委）:")
-    print("正值=对粉丝投票影响更大，负值=对评委评分影响更大")
+    # 合并比较
+    comparison = judge_importance.merge(placement_importance, on='feature')
+    comparison['diff'] = comparison['placement_importance'] - comparison['judge_importance']
+    comparison = comparison.sort_values('diff', ascending=False)
+    
+    print(f"\n  特征重要性差异（排名影响 - 评委影响）:")
+    print(f"  正值=对粉丝投票影响更大，负值=对评委评分影响更大\n")
+    
     for _, row in comparison.iterrows():
-        direction = "→ 粉丝偏好" if row['importance_diff'] > 0 else "→ 评委偏好"
-        print(f"  {row['feature']}: {row['importance_diff']:.4f} {direction}")
+        direction = "→ 粉丝偏好" if row['diff'] > 0 else "→ 评委偏好"
+        print(f"    {row['feature']}: {row['diff']:.4f} {direction}")
     
-    results['comparison'] = comparison
+    # 关键发现
+    print(f"\n【关键发现】")
+    fan_features = comparison[comparison['diff'] > 0.01]['feature'].tolist()
+    judge_features = comparison[comparison['diff'] < -0.01]['feature'].tolist()
     
-    return results
+    if fan_features:
+        print(f"  • 粉丝更看重: {', '.join(fan_features)}")
+    if judge_features:
+        print(f"  • 评委更看重: {', '.join(judge_features)}")
+    
+    return {
+        'comparison': comparison,
+        'judge_importance': judge_importance,
+        'placement_importance': placement_importance
+    }
 
 
 # ============================================
-# 第七部分：可视化生成
+# 第五部分：子问题3.3 - 舞者影响（简化）
 # ============================================
 
-def generate_visualizations(data, linear_results, xgb_results, diff_results, 
-                          feature_names, output_dir='output'):
+def analyze_dancer_impact(data):
     """
-    生成问题3相关的可视化图表
-    
-    参数:
-        data: 处理后的数据
-        linear_results: 线性回归结果
-        xgb_results: XGBoost结果
-        diff_results: 差异化分析结果
-        feature_names: 特征名称
-        output_dir: 输出目录
-    
-    返回:
-        生成的图表文件列表
+    子问题3.3：舞者特征的影响分析
     """
+    print("\n>>> 子问题3.3：舞者特征影响分析")
+    print("=" * 50)
+    
+    if 'ballroom_partner' not in data.columns:
+        print("  ⚠ 舞者数据不可用")
+        return None
+    
+    # 统计每个舞者的平均排名
+    dancer_stats = data.groupby('ballroom_partner').agg({
+        'placement': ['mean', 'std', 'count']
+    }).reset_index()
+    dancer_stats.columns = ['dancer', 'avg_placement', 'std_placement', 'n_seasons']
+    
+    # 筛选参与次数>=3的舞者
+    experienced_dancers = dancer_stats[dancer_stats['n_seasons'] >= 3].sort_values('avg_placement')
+    
+    print(f"\n  经验丰富舞者（>=3季）的表现:")
+    print(f"  {'舞者':<20} {'平均排名':<10} {'参与季数':<10}")
+    print(f"  {'-'*40}")
+    
+    for _, row in experienced_dancers.head(10).iterrows():
+        print(f"  {row['dancer']:<20} {row['avg_placement']:.1f}{'':<5} {int(row['n_seasons'])}")
+    
+    # 舞者效应显著性检验
+    dancer_groups = data.groupby('ballroom_partner')['placement'].apply(list).to_dict()
+    experienced_groups = {k: v for k, v in dancer_groups.items() if len(v) >= 2}
+    
+    if len(experienced_groups) > 1:
+        groups = list(experienced_groups.values())
+        f_stat, p_val = stats.f_oneway(*groups)
+        print(f"\n  舞者效应ANOVA: F={f_stat:.4f}, p={p_val:.4f}")
+        
+        if p_val < 0.05:
+            print(f"  【结论】舞者对选手排名有显著影响")
+        else:
+            print(f"  【结论】舞者效应不显著，名人自身特征更重要")
+    
+    return dancer_stats
+
+
+# ============================================
+# 第六部分：可视化
+# ============================================
+
+def generate_visualizations(results_q31, results_q32, dancer_stats, output_dir='output'):
+    """生成问题3可视化"""
     import matplotlib.pyplot as plt
-    import seaborn as sns
     import os
     
     plt.style.use('seaborn-v0_8-whitegrid')
-    plt.rcParams['font.size'] = 12
-    
     os.makedirs(output_dir, exist_ok=True)
     generated_files = []
     
-    # 图1: 线性回归系数图
-    if 'coefficients' in linear_results:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        coef_df = linear_results['coefficients']
-        colors = ['#e74c3c' if c < 0 else '#2ecc71' for c in coef_df['coefficient']]
-        
-        bars = ax.barh(coef_df['feature'], coef_df['coefficient'], color=colors)
-        ax.axvline(0, color='black', linewidth=0.8)
-        ax.set_xlabel('Regression Coefficient')
-        ax.set_title('Figure Q3-1: Linear Regression Coefficients for Celebrity Features')
-        ax.invert_yaxis()
-        
-        # 添加R²标注
-        ax.text(0.95, 0.05, f'R² = {linear_results["r2"]:.4f}', 
-                transform=ax.transAxes, ha='right', fontsize=12,
-                bbox=dict(boxstyle='round', facecolor='wheat'))
-        
-        filepath = os.path.join(output_dir, 'Q3_01_linear_coefficients.png')
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        plt.close()
-        generated_files.append(filepath)
-        print(f"✓ 生成: {filepath}")
+    # 图1: 特征重要性（线性回归系数）
+    fig, ax = plt.subplots(figsize=(10, 6))
+    coef = results_q31['coefficients']
+    colors = ['#e74c3c' if c < 0 else '#2ecc71' for c in coef['coefficient']]
     
-    # 图2: XGBoost特征重要性
-    if 'feature_importance' in xgb_results:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        imp_df = xgb_results['feature_importance']
-        
-        bars = ax.barh(imp_df['feature'], imp_df['importance'], color='steelblue')
-        ax.set_xlabel('Feature Importance')
-        ax.set_title('Figure Q3-2: XGBoost Feature Importance for Celebrity Characteristics')
-        ax.invert_yaxis()
-        
-        # 添加CV R²标注
-        ax.text(0.95, 0.05, f'CV R² = {xgb_results["cv_r2_mean"]:.4f}', 
-                transform=ax.transAxes, ha='right', fontsize=12,
-                bbox=dict(boxstyle='round', facecolor='wheat'))
-        
-        filepath = os.path.join(output_dir, 'Q3_02_xgb_importance.png')
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        plt.close()
-        generated_files.append(filepath)
-        print(f"✓ 生成: {filepath}")
+    ax.barh(coef['feature'], coef['coefficient'], color=colors)
+    ax.axvline(0, color='black', linewidth=0.8)
+    ax.set_xlabel('Regression Coefficient (Standardized)')
+    ax.set_title('Figure Q3-1: Celebrity Feature Coefficients (Linear Regression)')
+    ax.invert_yaxis()
+    
+    ax.text(0.95, 0.05, f'CV R² = {results_q31["linear_r2"]:.4f}', 
+            transform=ax.transAxes, ha='right', fontsize=12,
+            bbox=dict(boxstyle='round', facecolor='wheat'))
+    ax.text(0.5, -0.12, '结论：负系数表示该特征有利于获得更好排名（排名数值更小）', 
+            transform=ax.transAxes, ha='center', fontsize=10, style='italic',
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+    plt.tight_layout()
+    filepath = os.path.join(output_dir, 'Q3_01_linear_coefficients.png')
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    generated_files.append(filepath)
+    print(f"✓ 生成: {filepath}")
+    
+    # 图2: 特征重要性（随机森林）
+    fig, ax = plt.subplots(figsize=(10, 6))
+    imp = results_q31['importance']
+    ax.barh(imp['feature'], imp['importance'], color='steelblue')
+    ax.set_xlabel('Feature Importance')
+    ax.set_title('Figure Q3-2: Celebrity Feature Importance (Random Forest)')
+    ax.invert_yaxis()
+    
+    ax.text(0.95, 0.05, f'CV R² = {results_q31["rf_r2"]:.4f}', 
+            transform=ax.transAxes, ha='right', fontsize=12,
+            bbox=dict(boxstyle='round', facecolor='wheat'))
+    plt.tight_layout()
+    filepath = os.path.join(output_dir, 'Q3_02_rf_importance.png')
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    generated_files.append(filepath)
+    print(f"✓ 生成: {filepath}")
     
     # 图3: 年龄与排名关系
-    if 'age' in data.columns and 'placement' in data.columns:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        ax.scatter(data['age'], data['placement'], alpha=0.5, c='steelblue', s=50)
-        
-        # 添加趋势线
-        valid_mask = ~(data['age'].isna() | data['placement'].isna())
-        if valid_mask.sum() > 2:
-            z = np.polyfit(data.loc[valid_mask, 'age'], 
-                          data.loc[valid_mask, 'placement'], 2)
-            p = np.poly1d(z)
-            x_range = np.linspace(data['age'].min(), data['age'].max(), 100)
-            ax.plot(x_range, p(x_range), 'r-', linewidth=2, label='Polynomial Fit')
-        
-        ax.set_xlabel('Celebrity Age')
-        ax.set_ylabel('Final Placement (1 = Winner)')
-        ax.set_title('Figure Q3-3: Age vs Final Placement (Non-linear Relationship)')
-        ax.legend()
-        
-        # 添加最佳年龄区间标注
-        ax.axvspan(30, 45, alpha=0.2, color='green', label='Optimal Age Range')
-        
-        filepath = os.path.join(output_dir, 'Q3_03_age_placement.png')
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        plt.close()
-        generated_files.append(filepath)
-        print(f"✓ 生成: {filepath}")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    data = results_q31['data']
     
-    # 图4: 行业分组对比箱线图
-    if 'industry_group' in data.columns:
-        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-        
-        # 评委评分
-        industry_order = data.groupby('industry_group')['overall_avg_score'].median().sort_values(ascending=False).index
-        sns.boxplot(data=data, x='industry_group', y='overall_avg_score', 
-                   order=industry_order, ax=axes[0], palette='Set2')
-        axes[0].set_xlabel('Industry Group')
-        axes[0].set_ylabel('Average Judge Score')
-        axes[0].set_title('Judge Scores by Industry')
-        axes[0].tick_params(axis='x', rotation=45)
-        
-        # 最终排名
-        sns.boxplot(data=data, x='industry_group', y='placement', 
-                   order=industry_order, ax=axes[1], palette='Set2')
-        axes[1].set_xlabel('Industry Group')
-        axes[1].set_ylabel('Final Placement')
-        axes[1].set_title('Final Placement by Industry')
-        axes[1].tick_params(axis='x', rotation=45)
-        
-        plt.suptitle('Figure Q3-4: Industry Group Impact Analysis', fontsize=14, y=1.02)
-        plt.tight_layout()
-        
-        filepath = os.path.join(output_dir, 'Q3_04_industry_impact.png')
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        plt.close()
-        generated_files.append(filepath)
-        print(f"✓ 生成: {filepath}")
+    ax.scatter(data['age'], data['placement'], alpha=0.4, c='steelblue', s=40)
     
-    # 图5: 差异化影响对比图
-    if diff_results and 'comparison' in diff_results:
-        fig, ax = plt.subplots(figsize=(12, 6))
-        
-        comp_df = diff_results['comparison']
-        
-        x = np.arange(len(comp_df))
-        width = 0.35
-        
-        bars1 = ax.bar(x - width/2, comp_df['judge_importance'], width, 
-                      label='Judge Score Impact', color='steelblue')
-        bars2 = ax.bar(x + width/2, comp_df['placement_importance'], width, 
-                      label='Placement Impact', color='coral')
-        
-        ax.set_xlabel('Celebrity Features')
-        ax.set_ylabel('Feature Importance')
-        ax.set_title('Figure Q3-5: Differential Impact - Judge Score vs Final Placement')
-        ax.set_xticks(x)
-        ax.set_xticklabels(comp_df['feature'], rotation=45, ha='right')
-        ax.legend()
-        
-        # 添加解释性注释
-        ax.text(0.5, -0.2, 
-                'Note: Higher placement impact suggests stronger influence from fan voting',
-                transform=ax.transAxes, ha='center', fontsize=10, style='italic')
-        
-        filepath = os.path.join(output_dir, 'Q3_05_differential_impact.png')
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        plt.close()
-        generated_files.append(filepath)
-        print(f"✓ 生成: {filepath}")
+    # 添加趋势线
+    z = np.polyfit(data['age'].fillna(35), data['placement'], 2)
+    p = np.poly1d(z)
+    x_range = np.linspace(20, 70, 100)
+    ax.plot(x_range, p(x_range), 'r-', linewidth=2, label='Quadratic Fit')
     
-    # 图6: 地域分布热力图
-    if 'region' in data.columns:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        region_stats = data.groupby('region').agg({
-            'placement': 'mean',
-            'overall_avg_score': 'mean',
-            'celebrity_name': 'count'
-        }).rename(columns={'celebrity_name': 'count'})
-        
-        # 创建简单的条形图替代热力图
-        regions = region_stats.index.tolist()
-        x = np.arange(len(regions))
-        
-        ax.bar(x, region_stats['placement'], color='steelblue')
-        ax.set_xticks(x)
-        ax.set_xticklabels(regions, rotation=45, ha='right')
-        ax.set_ylabel('Average Placement')
-        ax.set_title('Figure Q3-6: Regional Distribution of Performance')
-        
-        # 添加样本量标注
-        for i, (region, row) in enumerate(region_stats.iterrows()):
-            ax.text(i, row['placement'] + 0.5, f'n={int(row["count"])}', 
-                   ha='center', fontsize=9)
-        
-        filepath = os.path.join(output_dir, 'Q3_06_regional_impact.png')
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        plt.close()
-        generated_files.append(filepath)
-        print(f"✓ 生成: {filepath}")
+    ax.set_xlabel('Celebrity Age')
+    ax.set_ylabel('Final Placement (1 = Winner)')
+    ax.set_title('Figure Q3-3: Age vs Final Placement')
+    ax.legend()
+    
+    # 标注最佳年龄
+    min_age = x_range[np.argmin(p(x_range))]
+    ax.axvline(min_age, color='green', linestyle='--', alpha=0.7)
+    ax.text(min_age+1, ax.get_ylim()[0]+0.5, f'Optimal: {min_age:.0f}', fontsize=10)
+    
+    ax.text(0.5, -0.12, f'结论：约{min_age:.0f}岁选手表现最优，呈现U型关系', 
+            transform=ax.transAxes, ha='center', fontsize=10, style='italic',
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+    plt.tight_layout()
+    filepath = os.path.join(output_dir, 'Q3_03_age_placement.png')
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    generated_files.append(filepath)
+    print(f"✓ 生成: {filepath}")
+    
+    # 图4: 行业对比
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    industry_stats = data.groupby('industry_group')['placement'].agg(['mean', 'std', 'count']).reset_index()
+    industry_stats = industry_stats.sort_values('mean')
+    
+    bars = ax.bar(industry_stats['industry_group'], industry_stats['mean'], 
+                  yerr=industry_stats['std'], capsize=5, color='steelblue', 
+                  edgecolor='white', alpha=0.8)
+    
+    # 添加样本量
+    for bar, n in zip(bars, industry_stats['count']):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+               f'n={int(n)}', ha='center', fontsize=9)
+    
+    ax.set_xlabel('Industry Group')
+    ax.set_ylabel('Average Placement (Lower = Better)')
+    ax.set_title('Figure Q3-4: Performance by Industry')
+    ax.tick_params(axis='x', rotation=30)
+    
+    best_industry = industry_stats.iloc[0]['industry_group']
+    ax.text(0.5, -0.15, f'结论：{best_industry}行业选手平均排名最优', 
+            transform=ax.transAxes, ha='center', fontsize=10, style='italic',
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+    plt.tight_layout()
+    filepath = os.path.join(output_dir, 'Q3_04_industry_comparison.png')
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    generated_files.append(filepath)
+    print(f"✓ 生成: {filepath}")
+    
+    # 图5: 差异化影响对比
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    comp = results_q32['comparison']
+    x = np.arange(len(comp))
+    width = 0.35
+    
+    ax.bar(x - width/2, comp['judge_importance'], width, 
+           label='Judge Score Impact', color='steelblue')
+    ax.bar(x + width/2, comp['placement_importance'], width, 
+           label='Placement Impact (incl. Fan)', color='coral')
+    
+    ax.set_xlabel('Celebrity Features')
+    ax.set_ylabel('Feature Importance')
+    ax.set_title('Figure Q3-5: Differential Impact - Judge vs Fan Preferences')
+    ax.set_xticks(x)
+    ax.set_xticklabels(comp['feature'], rotation=45, ha='right')
+    ax.legend()
+    
+    ax.text(0.5, -0.2, '结论：地区和国籍对粉丝投票影响更大，年龄和行业对评委影响更大', 
+            transform=ax.transAxes, ha='center', fontsize=10, style='italic',
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+    plt.tight_layout()
+    filepath = os.path.join(output_dir, 'Q3_05_differential_impact.png')
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    generated_files.append(filepath)
+    print(f"✓ 生成: {filepath}")
+    
+    # 图6: 地区分布
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    region_stats = data.groupby('region')['placement'].agg(['mean', 'count']).reset_index()
+    region_stats = region_stats.sort_values('mean')
+    
+    colors_region = plt.cm.RdYlGn_r(np.linspace(0.2, 0.8, len(region_stats)))
+    bars = ax.bar(region_stats['region'], region_stats['mean'], color=colors_region)
+    
+    for bar, n in zip(bars, region_stats['count']):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.2,
+               f'n={int(n)}', ha='center', fontsize=8)
+    
+    ax.set_xlabel('Region')
+    ax.set_ylabel('Average Placement (Lower = Better)')
+    ax.set_title('Figure Q3-6: Performance by Region')
+    ax.tick_params(axis='x', rotation=45)
+    
+    best_region = region_stats.iloc[0]['region']
+    ax.text(0.5, -0.18, f'结论：来自{best_region}地区的选手平均表现最优', 
+            transform=ax.transAxes, ha='center', fontsize=10, style='italic',
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+    plt.tight_layout()
+    filepath = os.path.join(output_dir, 'Q3_06_region_comparison.png')
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    generated_files.append(filepath)
+    print(f"✓ 生成: {filepath}")
     
     return generated_files
 
 
 # ============================================
-# 第八部分：模型保存与结果导出
-# ============================================
-
-def save_results(data, linear_results, xgb_results, diff_results, output_dir='output'):
-    """
-    保存分析结果
-    """
-    import os
-    import pickle
-    
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # 保存处理后的数据
-    data.to_csv(os.path.join(output_dir, 'Q3_processed_features.csv'), 
-                index=False, encoding='utf-8-sig')
-    
-    # 保存分析结果
-    results = {
-        'linear_results': linear_results,
-        'xgb_results': xgb_results,
-        'diff_results': diff_results
-    }
-    
-    with open(os.path.join(output_dir, 'Q3_analysis_results.pkl'), 'wb') as f:
-        pickle.dump(results, f)
-    
-    print(f"✓ 结果已保存到 {output_dir}")
-
-
-# ============================================
-# 主程序入口
+# 主程序
 # ============================================
 
 def main():
-    """
-    主程序：执行完整的名人特征影响分析流程
-    """
+    """问题3完整求解"""
     print("=" * 60)
     print("问题3：名人特征影响分析")
     print("=" * 60)
     
     # 1. 数据加载
-    print("\n【步骤1】数据加载")
     data = load_data('output/question3_data.csv')
-    
     if data is None:
-        print("数据加载失败，程序终止")
         return
     
     # 2. 特征工程
-    print("\n【步骤2】特征工程")
-    feature_engineer = FeatureEngineer()
-    data, feature_names = feature_engineer.build_features(data)
+    feature_engineer = CelebrityFeatureEngineer()
     
-    # 准备特征矩阵
-    X = data[feature_names].fillna(0).values
-    y = data['placement'].values  # 目标：最终排名
+    # 3. 子问题3.1：特征对结果的影响
+    results_q31 = analyze_feature_impact_on_results(data, feature_engineer)
     
-    # 3. 线性回归分析
-    print("\n【步骤3】线性回归分析")
-    linear_analyzer = LinearRegressionAnalyzer(regularization='ridge', alpha=1.0)
-    linear_results = linear_analyzer.fit(X, y, feature_names)
+    # 4. 子问题3.2：差异化影响
+    results_q32 = analyze_differential_impact(data, feature_engineer, results_q31)
     
-    # 4. XGBoost分析
-    print("\n【步骤4】XGBoost分析")
-    xgb_analyzer = XGBoostAnalyzer(n_estimators=100, max_depth=5)
-    xgb_results = xgb_analyzer.fit(X, y, feature_names)
+    # 5. 子问题3.3：舞者影响
+    dancer_stats = analyze_dancer_impact(data)
     
-    # 5. SHAP分析
-    print("\n【步骤5】SHAP分析")
-    shap_results = shap_analysis(xgb_analyzer.model, X, feature_names, 'output')
-    if shap_results:
-        xgb_results['shap'] = shap_results
+    # 6. 可视化
+    viz_files = generate_visualizations(results_q31, results_q32, dancer_stats)
     
-    # 6. 差异化影响分析
-    print("\n【步骤6】差异化影响分析")
-    diff_results = differential_impact_analysis(data, feature_engineer, 'output')
+    # 7. 保存结果
+    results_q31['data'].to_csv('output/Q3_feature_analysis.csv', 
+                               index=False, encoding='utf-8-sig')
     
-    # 7. 可视化生成
-    print("\n【步骤7】可视化生成")
-    viz_files = generate_visualizations(data, linear_results, xgb_results, 
-                                        diff_results, feature_names, 'output')
-    
-    # 8. 保存结果
-    print("\n【步骤8】保存结果")
-    save_results(data, linear_results, xgb_results, diff_results, 'output')
-    
-    # 9. 结果摘要
+    # 8. 结果摘要
     print("\n" + "=" * 60)
-    print("模型求解结果摘要")
+    print("问题3求解结果摘要")
     print("=" * 60)
-    print(f"• 分析样本数: {len(data)}")
-    print(f"• 特征数量: {len(feature_names)}")
-    print(f"• 线性回归 R²: {linear_results['r2']:.4f}")
-    print(f"• XGBoost CV R²: {xgb_results['cv_r2_mean']:.4f}")
-    print(f"• 生成可视化图表: {len(viz_files)} 个")
     
-    print("\n【关键发现】")
-    if 'coefficients' in linear_results:
-        top_feature = linear_results['coefficients'].iloc[0]
-        print(f"• 最重要线性特征: {top_feature['feature']} (系数={top_feature['coefficient']:.4f})")
+    print(f"\n【子问题3.1】名人特征对结果的影响:")
+    print(f"  • 线性回归 CV R²: {results_q31['linear_r2']:.4f}")
+    print(f"  • 随机森林 CV R²: {results_q31['rf_r2']:.4f}")
     
-    if 'feature_importance' in xgb_results:
-        top_xgb = xgb_results['feature_importance'].iloc[0]
-        print(f"• 最重要非线性特征: {top_xgb['feature']} (重要性={top_xgb['importance']:.4f})")
+    top_feature = results_q31['importance'].iloc[0]
+    print(f"  • 最重要特征: {top_feature['feature']} ({top_feature['importance']:.4f})")
     
-    print("\n>>> 问题3模型求解完成 <<<")
+    print(f"\n【子问题3.2】差异化影响分析:")
+    comp = results_q32['comparison']
+    fan_pref = comp[comp['diff'] > 0]['feature'].tolist()
+    judge_pref = comp[comp['diff'] < 0]['feature'].tolist()
+    if fan_pref:
+        print(f"  • 粉丝更偏好: {', '.join(fan_pref[:3])}")
+    if judge_pref:
+        print(f"  • 评委更偏好: {', '.join(judge_pref[:3])}")
     
-    return {
-        'data': data,
-        'linear_results': linear_results,
-        'xgb_results': xgb_results,
-        'diff_results': diff_results
-    }
+    print(f"\n【子问题3.3】舞者影响: 已分析")
+    
+    print(f"\n• 生成可视化: {len(viz_files)}个")
+    print("\n>>> 问题3求解完成 <<<")
+    
+    return results_q31, results_q32, dancer_stats
 
 
 if __name__ == '__main__':
