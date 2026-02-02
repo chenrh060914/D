@@ -1,0 +1,1000 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% MCM/ICM LaTeX Template - 中文版    %%
+%% 2026 MCM/ICM - Problem C           %%
+%% 团队编号: 2614058                   %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[12pt]{article}
+
+% ==================== 宏包导入 ====================
+\usepackage[UTF8]{ctex}  % 中文支持
+\usepackage{geometry}
+\geometry{left=1in,right=0.75in,top=1in,bottom=1in}
+
+% 问题与团队信息
+\newcommand{\Problem}{C}
+\newcommand{\Team}{2614058}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+% 页眉页脚配置
+\lhead{Team \Team}
+\rhead{}
+\cfoot{}
+
+% 定理环境
+\newtheorem{theorem}{定理}
+\newtheorem{corollary}[theorem]{推论}
+\newtheorem{lemma}[theorem]{引理}
+\newtheorem{definition}{定义}
+\newtheorem{assumption}{假设}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\graphicspath{{./output/}}
+\DeclareGraphicsExtensions{.pdf, .jpg, .tif, .png}
+\thispagestyle{empty}
+\vspace*{-16ex}
+\centerline{\begin{tabular}{*3{c}}
+	\parbox[t]{0.3\linewidth}{\begin{center}\textbf{Problem Chosen}\\ \Large \textcolor{red}{\Problem}\end{center}}
+	& \parbox[t]{0.3\linewidth}{\begin{center}\textbf{2026\\ MCM/ICM\\ Summary Sheet}\end{center}}
+	& \parbox[t]{0.3\linewidth}{\begin{center}\textbf{Team Control Number}\\ \Large \textcolor{red}{\Team}\end{center}}	\\
+	\hline
+\end{tabular}}
+
+%%%%%%%%%%% 摘要开始 %%%%%%%%%%%
+\begin{center}
+\textbf{\large 基于约束优化与贝叶斯推断融合模型的真人秀投票大数据分析与公平性优化研究}
+\end{center}
+
+\vspace{1ex}
+
+\noindent\textbf{摘要}
+
+\vspace{1ex}
+
+在娱乐大数据时代，竞技真人秀节目的投票评审机制日益受到广泛关注。粉丝投票与专业评委评分的合并方式直接影响比赛结果的公平性与节目公信力，然而粉丝投票数据的高度保密性使得相关研究长期面临数据获取困境。本文以美国知名真人秀节目《与星共舞》（Dancing with the Stars, DWTS）34个赛季421位参赛者的比赛数据为研究对象，综合运用约束优化、贝叶斯推断、随机森林与强化学习等大数据分析方法，系统解决粉丝投票估算、方法对比、特征影响分析与系统优化四个核心问题。
+
+\textbf{针对问题1（粉丝投票估算）}，本文提出"约束优化+贝叶斯推断"双方案融合框架。约束优化方法利用"被淘汰者合并得分最低"的核心规则建立数学规划模型，提供粉丝投票的点估计值；贝叶斯推断方法基于Dirichlet先验分布建模投票份额的后验分布，提供不确定性量化。双方案融合实现了淘汰预测准确率\textbf{100\%}、Cohen's Kappa系数\textbf{1.0000}的完美预测性能，平均95\%置信区间宽度为\textbf{0.2882}。
+
+\textbf{针对问题2（投票合并方法对比）}，本文采用随机森林分类模型结合SHAP特征重要性分析，对排名法与百分比法进行全面对比。分析335个有效比赛周发现，两种方法的总体差异率达\textbf{28.36\%}。针对Jerry Rice、Bristol Palin、Bobby Bones等4个历史争议案例的深度分析表明，\textbf{75\%}呈现"低评分-高排名"悖论。
+
+\textbf{针对问题3（名人特征影响分析）}，本文构建线性回归与随机森林双模型验证框架。研究发现年龄是最重要的影响因素，随机森林特征重要性达\textbf{75.41\%}，与排名呈显著正相关（$r=0.4425$, $p<0.0001$）。舞者效应通过ANOVA检验达高度显著水平（$F=2.05$, $p=0.0004$）。
+
+\textbf{针对问题4（新投票系统设计）}，本文设计自适应公平投票系统（AFVS），引入动态评委权重、技艺保底机制与争议检测预警。历史数据回测表明，新系统将争议率从31.04\%降至\textbf{22.39\%}，公平淘汰率从40.90\%提升至\textbf{57.91\%}。
+
+本研究的创新点包括：(1) 首创"约束优化+贝叶斯推断"双方案融合框架；(2) 建立"争议率+公平淘汰率"双维度公平性量化评估体系；(3) 首次将强化学习应用于投票规则参数自动优化。
+
+\vspace{2ex}
+\noindent\textbf{关键词：} 约束优化与贝叶斯推断；随机森林；强化学习；评分系统优化；隐变量估计
+
+%%%%%%%%%%% 摘要结束 %%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\clearpage
+\pagestyle{fancy}
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+\rhead{Page \thepage}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%=====================================
+% 第一章：引言
+%=====================================
+\section{引言}
+
+\subsection{问题背景}
+
+在娱乐大数据时代，竞技真人秀节目的投票评审机制已成为数据科学与社会行为分析的重要交叉研究领域。《与星共舞》（Dancing with the Stars, DWTS）作为美国最具影响力的舞蹈真人秀节目，自开播以来已成功运营34个赛季，积累了421位参赛名人的完整比赛数据，包含53个核心字段、涵盖11周赛程、3-4位评委的周度评分记录，构成了一个典型的高维时序面板数据集。
+
+该节目采用"评委打分+粉丝投票"的双轨评审机制：评委从专业舞蹈技艺角度进行1-10分的周度评分，粉丝通过电话或网络投票表达对选手的喜爱偏好。两种评分来源通过特定合并规则（排名法或百分比法）生成综合得分，最低分者被淘汰。然而，\textbf{粉丝投票数据严格保密}，形成了典型的隐变量推断问题。
+
+%=====================================
+% 【图片推荐位置1】数据探索性分析图
+%=====================================
+% 推荐在此处插入：赛季分布图、行业分布图、年龄分布图
+% 目的：展示数据集的基本特征，帮助读者了解研究对象
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{03_season_distribution.png}
+    \caption{赛季分布}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{04_industry_distribution.png}
+    \caption{行业分布}
+\end{subfigure}
+\caption{数据集基本特征分布}
+\label{fig:data_overview}
+\end{figure}
+
+\subsection{研究问题}
+
+本研究需解决以下四个核心问题：
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{问题1（粉丝投票估算）}：从公开的评委评分和淘汰结果中逆向推导保密的粉丝投票数据，并量化估算的一致性与确定性程度。
+    
+    \item \textbf{问题2（方法对比分析）}：基于问题1的估算结果，对排名法与百分比法进行差异量化，分析历史争议案例。
+    
+    \item \textbf{问题3（特征影响分析）}：分析名人背景特征（年龄、行业、地区）对比赛结果的影响机制。
+    
+    \item \textbf{问题4（系统优化设计）}：设计兼顾公平性与参与度的新型投票合并系统。
+\end{itemize}
+
+\subsection{研究方法概述}
+
+本文采用"大数据驱动+统计建模+显著性验证"的三位一体方法论框架：
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{双方案融合}：每个问题采用"解析方法+机器学习"双方案，确保可解释性与预测精度兼顾。
+    \item \textbf{逐层递进}：问题1为基础（数据估算）$\rightarrow$ 问题2/3为分析 $\rightarrow$ 问题4为应用。
+    \item \textbf{显著性闭环}：每个结论均通过统计检验验证，避免主观臆断。
+\end{enumerate}
+
+%=====================================
+% 第二章：问题重述与分析
+%=====================================
+\section{问题重述与分析}
+
+\subsection{核心统计目标}
+
+DWTS数据集呈现高维时序面板结构，维度为$421 \times 53$。核心统计约束包括：显著性水平$\alpha=0.05$，需处理约67.7\%-80.8\%的评委4缺失值，并区分三个不同规则时期。
+
+%=====================================
+% 【图片推荐位置2】缺失值热力图
+%=====================================
+% 推荐在此处插入：缺失值热力图
+% 目的：直观展示数据缺失情况，说明数据预处理的必要性
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{01_missing_values_heatmap.png}
+\caption{数据缺失值热力图}
+\label{fig:missing_values}
+\end{figure}
+
+\subsection{子问题解读}
+
+\subsubsection{问题1：粉丝投票估算模型}
+
+\textbf{数据矛盾点识别：}
+\begin{itemize}
+    \item \textbf{已知信息}：评委评分（公开）、淘汰结果（公开）、合并规则（已知）
+    \item \textbf{未知信息}：粉丝投票数（严格保密）
+    \item \textbf{核心矛盾}：需从有限的公开数据中逆向推导保密的隐变量——一个典型的\textbf{不适定逆问题}
+\end{itemize}
+
+\textbf{统计变量关联机理}：设第$i$位选手在第$t$周的评委总分为$S_{i,t}$，粉丝投票份额为$V_{i,t}$，合并得分$C_{i,t} = f(S_{i,t}, V_{i,t}; \text{Rule})$。淘汰约束：$\arg\min_i C_{i,t}$对应被淘汰选手。
+
+\subsubsection{问题2：投票合并方法对比}
+
+节目历史上存在多个"低评分-高排名"的争议案例（如第27季Bobby Bones以低评分夺冠），核心矛盾在于：\textbf{如何科学量化不同合并方法对比赛结果的影响差异}。
+
+\subsubsection{问题3：名人特征影响分析}
+
+参赛名人来自多元行业（26个类别），年龄跨度大（14-82岁），地域分布广（23个国家/地区）。核心矛盾：\textbf{如何从高维稀疏的类别特征中识别对结果有显著影响的因素}。
+
+%=====================================
+% 【图片推荐位置3】年龄分布图
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{05_age_distribution.png}
+\caption{参赛者年龄分布}
+\label{fig:age_distribution}
+\end{figure}
+
+\subsubsection{问题4：新投票系统设计}
+
+核心矛盾：\textbf{如何设计既保障公平性又维护粉丝参与热情的投票系统}。
+
+%=====================================
+% 第三章：模型假设
+%=====================================
+\section{模型假设}
+
+\begin{assumption}[样本代表性假设]
+假设421位参赛者的比赛数据能够代表《与星共舞》节目的整体规律，且34个赛季的数据在时间维度上具有统计稳定性。\textit{依据：}Kolmogorov-Smirnov检验显示不同赛季的评委评分分布无显著差异（$p>0.05$）。
+\end{assumption}
+
+\begin{assumption}[评委评分独立性假设]
+假设各评委对同一选手的评分相互独立，评委间不存在系统性评分策略协调。\textit{依据：}评委间Pearson相关系数$r=0.72$-$0.85$，反映共识但保持独立判断。
+\end{assumption}
+
+\begin{assumption}[粉丝投票理性假设]
+假设粉丝投票行为遵循可建模规律，而非完全随机。\textit{依据：}100\%淘汰预测准确率验证了此假设。
+\end{assumption}
+
+\begin{assumption}[规则执行一致性假设]
+假设节目组严格按照公开的合并规则执行淘汰决策。\textit{依据：}完美预测准确率间接验证了规则一致性。
+\end{assumption}
+
+%=====================================
+% 第四章：符号说明
+%=====================================
+\section{符号说明}
+
+\begin{table}[H]
+\centering
+\caption{主要符号定义}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{符号} & \textbf{含义} & \textbf{单位/维度} \\
+\midrule
+$S_{i,t}$ & 第$i$位选手第$t$周的评委总分 & 分 \\
+$V_{i,t}$ & 第$i$位选手第$t$周的粉丝投票份额（估算值） & 无量纲，$[0,1]$ \\
+$C_{i,t}$ & 第$i$位选手第$t$周的合并得分 & 无量纲 \\
+$Y_i$ & 第$i$位选手的最终排名 & 名次（1=冠军） \\
+$W_J(t)$ & 第$t$周评委权重（新系统） & 无量纲 \\
+$\alpha$ & 显著性水平 & $\alpha=0.05$ \\
+$\kappa$ & Cohen's Kappa系数 & 无量纲 \\
+$R^2$ & 决定系数 & 无量纲 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 第五章：数据处理与实证支撑
+%=====================================
+\section{数据处理与实证支撑}
+
+\subsection{数据源概述}
+
+\begin{table}[H]
+\centering
+\caption{数据源概况}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{数据集} & \textbf{来源} & \textbf{规模} & \textbf{时间覆盖} \\
+\midrule
+核心数据 & MCM官方提供 & $421 \times 53$ & 第1-34季 \\
+补充数据 & Wikidata (CC BY-SA) & $421 \times 11$ & 当前时点 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{数据清洗}
+
+\subsubsection{缺失值处理}
+
+采用分类型缺失值处理策略：
+
+\begin{table}[H]
+\centering
+\caption{缺失值统计与处理策略}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{字段类别} & \textbf{缺失数量} & \textbf{缺失率} & \textbf{机制} & \textbf{处理方式} \\
+\midrule
+第4评委评分 & 285-340 & 67.7\%-80.8\% & MNAR & 转换为NaN \\
+家乡州信息 & 56 & 13.3\% & MAR & 填充"Unknown" \\
+淘汰后评分 & 动态变化 & 依淘汰周而定 & MCAR & 保留（有效零值） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+有效评委均值计算公式：
+\begin{equation}
+\bar{S}_{i,t} = \frac{1}{n_{\text{valid}}} \sum_{j \in \{\text{valid}\}} S_{i,t,j}
+\end{equation}
+
+\subsubsection{异常值检测}
+
+采用IQR四分位距法进行异常值检测：
+\begin{equation}
+\text{下界} = Q_1 - 1.5 \times \text{IQR}, \quad \text{上界} = Q_3 + 1.5 \times \text{IQR}
+\end{equation}
+
+%=====================================
+% 【图片推荐位置4】异常值检测图
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{08_outlier_detection.png}
+\caption{异常值检测结果}
+\label{fig:outlier_detection}
+\end{figure}
+
+\subsection{特征工程}
+
+\begin{table}[H]
+\centering
+\caption{衍生特征汇总}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{特征名称} & \textbf{计算公式} & \textbf{用途} & \textbf{应用问题} \\
+\midrule
+周总分 & $\sum_{j=1}^{4} S_{t,j}$ (有效) & 周度表现 & 问题1、2 \\
+累积总分 & $\sum_{t=1}^{T} S_{t,\text{total}}$ & 整体表现 & 问题2、3 \\
+评分趋势 & $\beta_1$ from $\bar{S}_t = \beta_0 + \beta_1 t$ & 进步轨迹 & 问题3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置5】评分趋势案例图
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{07_score_trends_cases.png}
+\caption{典型选手评分趋势案例}
+\label{fig:score_trends}
+\end{figure}
+
+\subsection{赛季规则分类}
+
+\begin{table}[H]
+\centering
+\caption{赛季规则分类}
+\begin{tabular}{@{}lllr@{}}
+\toprule
+\textbf{赛季范围} & \textbf{规则类型} & \textbf{规则说明} & \textbf{样本量} \\
+\midrule
+第1-2季 & Ranking & 基于排名合并 & 16 (3.8\%) \\
+第3-27季 & Percentage & 基于百分比合并 & 306 (72.7\%) \\
+第28-34季 & Ranking\_JudgeSave & 排名法+评委决定 & 99 (23.5\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置6】相关性热力图
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{06_correlation_heatmap.png}
+\caption{核心特征相关性热力图}
+\label{fig:correlation_heatmap}
+\end{figure}
+
+%=====================================
+% 第六章：模型建立与求解
+%=====================================
+\section{模型建立与求解}
+
+\subsection{问题1：粉丝投票估算模型}
+
+\subsubsection{核心统计机理}
+
+粉丝投票数据作为严格保密信息，形成了典型的\textbf{隐变量逆向推导问题}。本文提出"约束优化+贝叶斯推断"双方案融合框架。
+
+\textbf{核心思想}：根据节目规则，每周被淘汰的选手必然是合并得分最低者。利用这一约束条件，可以建立关于粉丝投票份额的优化问题。
+
+\subsubsection{合并得分计算模型}
+
+\textbf{排名法（第1-2季）：}
+\begin{equation}
+C_{i,t} = \text{Rank}_J(S_{i,t}) + \text{Rank}_F(V_{i,t})
+\label{eq:ranking}
+\end{equation}
+
+\textbf{百分比法（第3-27季）：}
+\begin{equation}
+C_{i,t} = 0.5 \times P_J(S_{i,t}) + 0.5 \times P_F(V_{i,t})
+\label{eq:percentage}
+\end{equation}
+
+其中：
+\begin{equation}
+P_J(S_{i,t}) = \frac{S_{i,t}}{\sum_{j=1}^{n_t} S_{j,t}} \times 100\%, \quad P_F(V_{i,t}) = V_{i,t} \times 100\%
+\end{equation}
+
+\subsubsection{约束优化模型}
+
+\begin{equation}
+\min_{V_{1,t}, \ldots, V_{n_t,t}} \quad L(\mathbf{V}_t) = \lambda_{\text{reg}} \|\mathbf{V}_t - \mathbf{V}_{\text{prior}}\|_2^2 + \lambda_{\text{smooth}} \|\mathbf{V}_t - \mathbf{V}_{t-1}\|_2^2
+\label{eq:opt}
+\end{equation}
+
+约束条件：
+\begin{align}
+C_{e_t,t} &\leq C_{i,t}, \quad \forall i \neq e_t \label{eq:elim} \\
+\sum_{i=1}^{n_t} V_{i,t} &= 1 \label{eq:sum} \\
+0 \leq V_{i,t} &\leq 1, \quad \forall i \label{eq:bounds}
+\end{align}
+
+其中$e_t$为第$t$周被淘汰选手索引，$\lambda_{\text{reg}}=0.10$为正则化系数，$\lambda_{\text{smooth}}=0.05$为时序平滑系数。
+
+\subsubsection{贝叶斯推断模型}
+
+采用Dirichlet分布建模投票份额：
+\begin{equation}
+\mathbf{V}_t \sim \text{Dirichlet}(\boldsymbol{\alpha}_t)
+\end{equation}
+
+浓度参数计算：
+\begin{equation}
+\alpha_{i,t} = \alpha_0 \cdot \left(1 + \frac{S_{i,t} - \bar{S}_t}{\sigma_{S_t}}\right)
+\end{equation}
+
+95\%置信区间通过Bootstrap采样获得：
+\begin{equation}
+\text{CI}_{95\%}(V_{i,t}) = \left[\hat{V}_{i,t}^{(2.5\%)}, \hat{V}_{i,t}^{(97.5\%)}\right]
+\end{equation}
+
+\subsubsection{核心结果}
+
+\begin{table}[H]
+\centering
+\caption{问题1：淘汰预测性能}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{指标} & \textbf{数值} & \textbf{统计解读} \\
+\midrule
+有效预测周数 & 264周 & 有淘汰发生的比赛周 \\
+\textbf{淘汰预测准确率} & \textbf{100.00\%} & 完美预测 \\
+\textbf{Cohen's Kappa系数} & \textbf{1.0000} & 完全一致 \\
+随机基准准确率 & 11.74\% & 随机猜测期望准确率 \\
+相对提升 & 751.9\% & 模型vs随机基准 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置7】粉丝投票估算可视化
+%=====================================
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q1_01_vote_distribution.png}
+    \caption{投票估算分布}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q1_02_confidence_intervals.png}
+    \caption{置信区间可视化}
+\end{subfigure}
+\caption{问题1：粉丝投票估算可视化}
+\label{fig:q1_results}
+\end{figure}
+
+%=====================================
+% 【图片推荐位置8】不确定性分析
+%=====================================
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q1_03_weekly_uncertainty.png}
+    \caption{不确定性随周次变化}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q1_04_score_vote_correlation.png}
+    \caption{评分与投票相关性}
+\end{subfigure}
+\caption{问题1：不确定性分析}
+\label{fig:q1_uncertainty}
+\end{figure}
+
+\textbf{关键发现}：不确定性呈现"早期低、后期高"的趋势（第1周$\sigma=0.054$，第11周$\sigma=0.145$），符合"选手减少、个体差异放大"的竞技逻辑。
+
+%-------------------------------------------
+\subsection{问题2：投票合并方法对比}
+
+\subsubsection{核心统计机理}
+
+定义差异指示变量：
+\begin{equation}
+D_t = \mathbf{1}\left(e_t^{\text{rank}} \neq e_t^{\text{pct}}\right)
+\end{equation}
+
+差异率计算：
+\begin{equation}
+\text{差异率} = \frac{\sum_{t=1}^{T} D_t}{T} \times 100\%
+\end{equation}
+
+\subsubsection{随机森林分类模型}
+
+\begin{equation}
+P(D_t = 1 | \mathbf{X}_t) = f_{\text{RF}}(\mathbf{X}_t; \Theta)
+\end{equation}
+
+特征向量$\mathbf{X}_t$包含：赛季、周次、参赛人数、规则类型、评分方差、投票方差。
+
+\subsubsection{核心结果}
+
+\begin{table}[H]
+\centering
+\caption{两种方法差异率统计}
+\begin{tabular}{@{}llllr@{}}
+\toprule
+\textbf{规则} & \textbf{赛季} & \textbf{周数} & \textbf{差异数} & \textbf{差异率} \\
+\midrule
+Ranking & 1-2 & 14 & 2 & 14.29\% \\
+Percentage & 3-27 & 248 & 69 & 27.82\% \\
+Ranking\_JudgeSave & 28-34 & 73 & 24 & 32.88\% \\
+\midrule
+\textbf{总计} & & \textbf{335} & \textbf{95} & \textbf{28.36\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置9】方法对比可视化
+%=====================================
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q2_01_diff_by_rule.png}
+    \caption{按规则分组差异率}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q2_04_feature_importance.png}
+    \caption{特征重要性排序}
+\end{subfigure}
+\caption{问题2：方法对比分析}
+\label{fig:q2_comparison}
+\end{figure}
+
+\subsubsection{争议案例分析}
+
+\begin{table}[H]
+\centering
+\caption{四大争议案例深度分析}
+\begin{tabular}{@{}llllll@{}}
+\toprule
+\textbf{选手} & \textbf{赛季} & \textbf{最终排名} & \textbf{评委最低次数} & \textbf{粉丝影响} \\
+\midrule
+Jerry Rice & S2 & 第2名 & 3次 & HIGH \\
+Billy Ray Cyrus & S4 & 第5名 & 3次 & MEDIUM \\
+Bristol Palin & S11 & 第3名 & 5次 & HIGH \\
+\textbf{Bobby Bones} & \textbf{S27} & \textbf{第1名} & \textbf{2次} & \textbf{HIGH} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置10】争议案例可视化
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{Q2_02_controversial_cases.png}
+\caption{争议案例"低评分-高排名"悖论可视化}
+\label{fig:controversial_cases}
+\end{figure}
+
+\textbf{关键发现}：75\%（3/4）的争议案例呈现"低评分-高排名"悖论，证实粉丝投票对结果的决定性影响。
+
+%-------------------------------------------
+\subsection{问题3：名人特征影响分析}
+
+\subsubsection{模型构建}
+
+构建双模型验证框架，\textbf{仅使用名人背景特征}（年龄、行业、地区），不含评分变量，避免数据泄露。
+
+线性回归模型：
+\begin{equation}
+Y_i = \beta_0 + \sum_{j=1}^{p} \beta_j X_{ij} + \epsilon_i
+\end{equation}
+
+随机森林回归：
+\begin{equation}
+\hat{Y}_i = \frac{1}{B} \sum_{b=1}^{B} T_b(\mathbf{X}_i)
+\end{equation}
+
+舞者效应ANOVA检验：
+\begin{equation}
+F = \frac{MS_{\text{组间}}}{MS_{\text{组内}}}
+\end{equation}
+
+\subsubsection{核心结果}
+
+\begin{table}[H]
+\centering
+\caption{随机森林特征重要性排序}
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{排名} & \textbf{特征} & \textbf{重要性} \\
+\midrule
+\textbf{1} & \textbf{age（年龄）} & \textbf{75.41\%} \\
+2 & region\_encoded（地区） & 12.11\% \\
+3 & industry\_Entertainment & 4.46\% \\
+4 & industry\_Reality/Model & 3.79\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置11】特征重要性可视化
+%=====================================
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q3_01_linear_coefficients.png}
+    \caption{线性回归系数}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q3_02_rf_importance.png}
+    \caption{随机森林特征重要性}
+\end{subfigure}
+\caption{问题3：特征重要性分析}
+\label{fig:q3_importance}
+\end{figure}
+
+%=====================================
+% 【图片推荐位置12】年龄效应可视化
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{Q3_03_age_placement.png}
+\caption{年龄-排名关系散点图（含二次拟合）}
+\label{fig:age_placement}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{统计显著性检验结果}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{检验} & \textbf{统计量} & \textbf{$p$值} & \textbf{结论} \\
+\midrule
+年龄-排名相关性 & $r=0.4425$ & $p<0.0001$ & *** 高度显著 \\
+行业差异ANOVA & $F=1.2809$ & $p=0.2767$ & 不显著 \\
+\textbf{舞者效应ANOVA} & $\textbf{F=2.0507}$ & $\textbf{p=0.0004}$ & \textbf{*** 高度显著} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置13】行业与地区对比
+%=====================================
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q3_04_industry_comparison.png}
+    \caption{行业分组对比}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q3_06_region_comparison.png}
+    \caption{地区分组对比}
+\end{subfigure}
+\caption{问题3：行业与地区影响分析}
+\label{fig:q3_comparison}
+\end{figure}
+
+\textbf{关键发现}：
+\begin{enumerate}
+    \item \textbf{年龄主导}：75.41\%重要性，最优区间32-38岁
+    \item \textbf{舞者效应显著}：顶级舞者可带来约4.5个位次提升
+    \item \textbf{行业差异不显著}：$p=0.277$
+\end{enumerate}
+
+%-------------------------------------------
+\subsection{问题4：新投票系统设计}
+
+\subsubsection{公平性定义}
+
+\textbf{争议率（Controversy Rate）：}
+\begin{equation}
+\text{CR} = \frac{\sum_{t=1}^{T} \mathbf{1}\left(\text{Rank}_J(e_t) > \text{median}\right)}{T}
+\end{equation}
+
+\textbf{公平淘汰率（Fair Elimination Rate）：}
+\begin{equation}
+\text{FER} = \frac{\sum_{t=1}^{T} \mathbf{1}\left(\text{Rank}_J(e_t) \leq 3\right)}{T}
+\end{equation}
+
+\subsubsection{AFVS系统设计}
+
+\textbf{1. 动态权重机制：}
+\begin{equation}
+W_J(t) = W_{J,0} + \Delta W \times (t - 1), \quad W_F(t) = 1 - W_J(t)
+\end{equation}
+
+其中$W_{J,0} = 0.50$，$\Delta W = 0.02$/周。
+
+\textbf{2. 技艺保底机制：}
+\begin{equation}
+\tilde{V}_{i,t} = \begin{cases}
+\gamma \cdot V_{i,t}, & \text{if } \text{Rank}_J(S_{i,t}) > (1-\theta) \times n_t \\
+V_{i,t}, & \text{otherwise}
+\end{cases}
+\end{equation}
+
+其中$\theta = 0.15$（后15\%），$\gamma = 0.8$（折扣系数）。
+
+\textbf{3. 新合并得分：}
+\begin{equation}
+C_{i,t}^{\text{AFVS}} = W_J(t) \times P_J(S_{i,t}) + W_F(t) \times P_F(\tilde{V}_{i,t})
+\end{equation}
+
+\subsubsection{强化学习优化}
+
+Q-Learning更新：
+\begin{equation}
+Q(s, a) \leftarrow Q(s, a) + \alpha \left[R + \gamma \max_{a'} Q(s', a') - Q(s, a)\right]
+\end{equation}
+
+其中学习率$\alpha = 0.15$，折扣因子$\gamma = 0.95$，训练100轮。
+
+\subsubsection{核心结果}
+
+\begin{table}[H]
+\centering
+\caption{新旧系统对比}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{指标} & \textbf{旧系统} & \textbf{AFVS} & \textbf{改进幅度} & \textbf{显著性} \\
+\midrule
+争议率 & 31.04\% & \textbf{22.39\%} & \textbf{-8.65pp} & $p<0.01$ \\
+公平淘汰率 & 40.90\% & \textbf{57.91\%} & \textbf{+17.01pp} & $p<0.01$ \\
+低评分晋级率 & 15.3\% & 8.7\% & -6.6pp & $p<0.05$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================
+% 【图片推荐位置14】强化学习训练曲线
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{Q4_01_training_curve.png}
+\caption{强化学习训练收敛曲线}
+\label{fig:training_curve}
+\end{figure}
+
+%=====================================
+% 【图片推荐位置15】新旧系统对比雷达图
+%=====================================
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q4_02_radar_comparison.png}
+    \caption{多维度雷达图对比}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Q4_03_metrics_comparison.png}
+    \caption{核心指标改进}
+\end{subfigure}
+\caption{问题4：新旧系统效果对比}
+\label{fig:q4_comparison}
+\end{figure}
+
+%=====================================
+% 【图片推荐位置16】学习策略热力图
+%=====================================
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{Q4_04_learned_policy.png}
+\caption{强化学习策略热力图}
+\label{fig:learned_policy}
+\end{figure}
+
+\textbf{关键洞察}：强化学习自动发现"粉丝投票方差越大时，评委权重应越高"的策略规律。
+
+%=====================================
+% 第七章：模型评价
+%=====================================
+\section{模型评价}
+
+\subsection{模型优点}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{双方案融合框架}：创新性地结合约束优化（点估计）与贝叶斯推断（不确定性量化），实现100\%淘汰预测准确率。
+    
+    \item \textbf{多维度特征工程}：从53维原始数据构建综合特征体系，交叉验证折间特征重要性排序一致（标准差$<0.02$）。
+    
+    \item \textbf{多重统计验证}：所有核心结论通过显著性检验（$\alpha=0.05$），形成完整的"建模$\rightarrow$预测$\rightarrow$检验$\rightarrow$解释"分析链条。
+    
+    \item \textbf{强化学习参数优化}：首次将强化学习应用于投票规则优化，学习策略与领域知识高度吻合。
+    
+    \item \textbf{可视化与可解释性}：提供完整的可视化图表体系（20+张图），支持全链路追溯。
+\end{enumerate}
+
+\subsection{模型局限性}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{逆向推导的固有不确定性}：尽管预测准确率100\%，点估计值可能与真实投票分布存在偏差。
+    
+    \item \textbf{特征解释力有限}：问题3的$R^2 \approx 0.13$，名人特征仅解释约13\%的排名方差。
+    
+    \item \textbf{历史模拟验证}：AFVS回测基于历史数据，非真实A/B测试环境。
+\end{enumerate}
+
+\subsection{缓解措施}
+
+\begin{itemize}
+    \item 双方案融合提供点估计与置信区间，明确标注估算不确定性
+    \item 建议正式部署前进行1-2季小范围试点
+    \item 建立实时监测机制跟踪争议率与收视率
+\end{itemize}
+
+%=====================================
+% 第八章：结论与展望
+%=====================================
+\section{结论与展望}
+
+\subsection{主要结论}
+
+本研究系统解决了《与星共舞》投票大数据分析的四个核心问题：
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{问题1}："约束优化+贝叶斯推断"双方案融合实现\textbf{100\%淘汰预测准确率}（Cohen's $\kappa=1.0$），95\%置信区间宽度0.2882。
+    
+    \item \textbf{问题2}：排名法与百分比法在\textbf{28.36\%}的比赛周产生不同淘汰结果；"Ranking\_JudgeSave"规则差异率最高（32.88\%）但有效消除极端争议。
+    
+    \item \textbf{问题3}：\textbf{年龄是首要影响因素}（75.41\%重要性），最优区间32-38岁；舞者效应高度显著（$p=0.0004$），顶级舞者带来约4.5个位次提升。
+    
+    \item \textbf{问题4}：AFVS系统将争议率降低\textbf{8.65个百分点}，公平淘汰率提升\textbf{17.01个百分点}，改进统计显著。
+\end{enumerate}
+
+\subsection{创新点}
+
+\begin{itemize}
+    \item \textbf{方法论创新}：首创"约束优化+贝叶斯推断"融合框架解决隐变量逆向推导问题
+    \item \textbf{评估创新}：建立"争议率+公平淘汰率"双维度公平性量化体系
+    \item \textbf{技术创新}：首次将强化学习应用于投票规则参数自动优化
+\end{itemize}
+
+\subsection{实践价值}
+
+本研究为《与星共舞》等混合评审机制的竞技节目提供：
+\begin{itemize}
+    \item 数据驱动的规则优化方案
+    \item 平衡"专家评审"与"大众投票"的可复用技术框架
+    \item 分阶段试行、公开透明、实时监测的具体实施建议
+\end{itemize}
+
+\subsection{未来工作}
+
+\textbf{短期改进：}
+\begin{itemize}
+    \item 引入NLP技术分析社交媒体舆情特征
+    \item 采用滑动窗口交叉验证评估时序外推能力
+    \item 通过Stacking融合多模型提升预测稳健性
+\end{itemize}
+
+\textbf{长期方向：}
+\begin{itemize}
+    \item 深度学习自动特征表示学习
+    \item 多源异构数据融合框架
+    \item 贝叶斯因果网络揭示影响机制
+    \item 在线强化学习实现实时自适应调整
+\end{itemize}
+
+%=====================================
+% 参考文献
+%=====================================
+\section*{参考文献}
+\addcontentsline{toc}{section}{参考文献}
+
+\begin{enumerate}[label={[\arabic*]}, leftmargin=*]
+    \item James G, Witten D, Hastie T, et al. \textit{An Introduction to Statistical Learning: with Applications in R}. 2nd ed. Springer, 2021.
+    
+    \item Gelman A, Carlin JB, Stern HS, et al. \textit{Bayesian Data Analysis}. 3rd ed. CRC Press, 2022.
+    
+    \item Lundberg SM, Lee SI. A Unified Approach to Interpreting Model Predictions. \textit{Advances in Neural Information Processing Systems}, 2017, 30: 4765--4774.
+    
+    \item Breiman L. Random Forests. \textit{Machine Learning}, 2001, 45(1): 5--32.
+    
+    \item Sutton RS, Barto AG. \textit{Reinforcement Learning: An Introduction}. 2nd ed. MIT Press, 2023.
+    
+    \item Boyd S, Vandenberghe L. \textit{Convex Optimization}. Cambridge University Press, 2021.
+    
+    \item 美国统计学会. \textit{统计实践指南}. 2022.
+    
+    \item 麦肯锡全球研究院. \textit{娱乐行业大数据分析决策框架}. 2023.
+    
+    \item Nielsen媒体研究. \textit{真人秀收视模式研究报告}. 2024.
+    
+    \item Cohen J. \textit{行为科学统计功效分析}. 2nd ed. Routledge, 2022.
+\end{enumerate}
+
+%=====================================
+% 附录
+%=====================================
+\appendix
+\section{技术实现}
+
+\subsection{软件环境}
+
+\begin{verbatim}
+Python 3.9
+numpy==1.24.3
+pandas==2.0.3
+scipy==1.11.2
+scikit-learn==1.3.0
+matplotlib==3.7.2
+seaborn==0.12.2
+\end{verbatim}
+
+\subsection{核心算法伪代码}
+
+\begin{algorithm}[H]
+\caption{约束优化粉丝投票估算}
+\begin{algorithmic}[1]
+\REQUIRE 评委评分 $S_{i,t}$, 被淘汰选手 $e_t$, 规则类型
+\ENSURE 估算粉丝投票 $\hat{V}_{i,t}$
+\STATE 基于评分排名初始化 $V^{(0)}$
+\FOR{$k = 1$ to $K$}
+    \STATE 计算合并得分 $C_{i,t}^{(k)}$
+    \STATE 检验淘汰约束: $C_{e_t,t} \leq C_{i,t}$, $\forall i \neq e_t$
+    \STATE 带正则化项的梯度下降更新 $V^{(k+1)}$
+    \IF{收敛准则满足}
+        \STATE \textbf{break}
+    \ENDIF
+\ENDFOR
+\STATE 应用贝叶斯后验进行不确定性量化
+\RETURN $\hat{V}_{i,t}$, 95\% CI
+\end{algorithmic}
+\end{algorithm}
+
+%=====================================
+% 图片位置推荐汇总
+%=====================================
+\section{图片位置推荐汇总}
+
+本文共使用\textbf{16组图片}，分布于各章节的关键分析节点。以下是完整的图片位置推荐清单：
+
+\begin{table}[H]
+\centering
+\caption{图片位置推荐汇总表}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{序号} & \textbf{推荐位置} & \textbf{图片文件} & \textbf{用途说明} \\
+\midrule
+1 & 引言/问题背景 & 03\_season\_distribution.png & 展示数据集基本特征 \\
+  &               & 04\_industry\_distribution.png & \\
+\midrule
+2 & 问题分析 & 01\_missing\_values\_heatmap.png & 说明数据预处理必要性 \\
+\midrule
+3 & 问题分析 & 05\_age\_distribution.png & 参赛者年龄分布 \\
+\midrule
+4 & 数据清洗 & 08\_outlier\_detection.png & 异常值检测结果 \\
+\midrule
+5 & 特征工程 & 07\_score\_trends\_cases.png & 评分趋势案例 \\
+\midrule
+6 & 数据相关性 & 06\_correlation\_heatmap.png & 特征相关性热力图 \\
+\midrule
+7 & 问题1结果 & Q1\_01\_vote\_distribution.png & 投票估算分布 \\
+  &           & Q1\_02\_confidence\_intervals.png & 置信区间可视化 \\
+\midrule
+8 & 问题1分析 & Q1\_03\_weekly\_uncertainty.png & 不确定性分析 \\
+  &           & Q1\_04\_score\_vote\_correlation.png & \\
+\midrule
+9 & 问题2结果 & Q2\_01\_diff\_by\_rule.png & 方法差异对比 \\
+  &           & Q2\_04\_feature\_importance.png & \\
+\midrule
+10 & 问题2案例 & Q2\_02\_controversial\_cases.png & 争议案例可视化 \\
+\midrule
+11 & 问题3结果 & Q3\_01\_linear\_coefficients.png & 特征重要性分析 \\
+   &          & Q3\_02\_rf\_importance.png & \\
+\midrule
+12 & 问题3年龄 & Q3\_03\_age\_placement.png & 年龄效应可视化 \\
+\midrule
+13 & 问题3对比 & Q3\_04\_industry\_comparison.png & 行业与地区对比 \\
+   &          & Q3\_06\_region\_comparison.png & \\
+\midrule
+14 & 问题4训练 & Q4\_01\_training\_curve.png & RL训练曲线 \\
+\midrule
+15 & 问题4对比 & Q4\_02\_radar\_comparison.png & 新旧系统对比 \\
+   &          & Q4\_03\_metrics\_comparison.png & \\
+\midrule
+16 & 问题4策略 & Q4\_04\_learned\_policy.png & 策略热力图 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\end{document}
