@@ -196,14 +196,14 @@ Style requirements:
 Create a radar chart (spider chart) comparing the strengths and limitations of the integrated modeling framework.
 
 Dimension axes (8 spokes):
-1. Prediction Accuracy (0-100%): Score 100 (淘汰预测准确率100%)
-2. Statistical Rigor (0-100%): Score 95 (多重统计检验验证)
-3. Robustness (0-100%): Score 92 (±5%噪声下性能稳定)
-4. Interpretability (0-100%): Score 88 (SHAP可解释性分析)
-5. Innovation (0-100%): Score 90 (双方案融合框架首创)
-6. Data Adaptability (0-100%): Score 85 (处理三种赛季规则)
-7. Uncertainty Quantification (0-100%): Score 82 (95%CI宽度0.2882)
-8. Generalizability (0-100%): Score 75 (R²=0.13限于名人特征)
+1. Prediction Accuracy (0-100%): Score 100 (100% elimination prediction accuracy)
+2. Statistical Rigor (0-100%): Score 95 (multiple statistical tests validation)
+3. Robustness (0-100%): Score 92 (stable performance under ±5% noise)
+4. Interpretability (0-100%): Score 88 (SHAP explainability analysis)
+5. Innovation (0-100%): Score 90 (pioneering dual-scheme fusion framework)
+6. Data Adaptability (0-100%): Score 85 (handles three season rule types)
+7. Uncertainty Quantification (0-100%): Score 82 (95% CI width 0.2882)
+8. Generalizability (0-100%): Score 75 (R²=0.13 limited to celebrity features)
 
 Visual specifications:
 - Fill area: semi-transparent blue (#1E88E5, alpha=0.3)
